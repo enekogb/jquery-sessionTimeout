@@ -1,4 +1,4 @@
-﻿/*jshint browser:true*/
+/*jshint browser:true*/
 
 //
 // jquery.sessionTimeout.js
@@ -41,6 +41,14 @@
 //     URL to take browser to if user clicks "Log Out Now"
 //     Default: '/log-out'
 //
+//   logoutUrlRequestType
+//     How should we make the call to the log-out url? (GET/POST/PUT/DELETE)
+//     Default: 'GET'
+//
+//   logoutSuccessUrl
+//     URL to take browser after logout AJAX request has finished 
+//     Default: '/logged-out'
+//
 //   warnAfter
 //     Time in milliseconds after page is opened until warning dialog is opened
 //     Default: 900000 (15 minutes)
@@ -53,6 +61,19 @@
 //     If true, appends the current time stamp to the Keep Alive url to prevent caching issues
 //     Default: true
 //
+//   logOutNowButtonLabel
+//     Text shown inside the "Log Out Now" button
+//     Default: Log Out Now
+//
+//   stayConnectedButtonLabel
+//     Text shown inside the "Stay Connected" button
+//     Default: Stay Connected
+//
+//   ajaxHeaders
+//     Headers to be sent in every AJAX request
+//     Default: {}
+//
+
 (function ($) {
     jQuery.sessionTimeout = function (options) {
         var defaults = {
@@ -61,9 +82,14 @@
             keepAliveAjaxRequestType: 'POST',
             redirUrl: '/timed-out',
             logoutUrl: '/log-out',
+            logoutUrlRequestType: 'GET',
+            logoutSuccessUrl: '/logged-out',
             warnAfter: 900000, // 15 minutes
             redirAfter: 1200000, // 20 minutes
-            appendTime: true // appends time stamp to keep alive url to prevent caching
+            appendTime: true, // appends time stamp to keep alive url to prevent caching
+            logOutNowButtonLabel: 'Log Out Now',
+            stayConnectedButtonLabel: 'Stay Connected',
+            ajaxHeaders: {}
         };
 
         // Extend user-set options over defaults
@@ -75,22 +101,32 @@
 
         // Create timeout warning dialog
         $('body').append('<div title="Session Timeout" id="sessionTimeout-dialog">' + o.message + '</div>');
+
+        // Show dialog
         $('#sessionTimeout-dialog').dialog({
             autoOpen: false,
             width: 400,
             modal: true,
             closeOnEscape: false,
             open: function () { $(".ui-dialog-titlebar-close").hide(); },
-            buttons: {
-                // Button one - takes user to logout URL
-                "Log Out Now": function () {
-                    window.location = o.logoutUrl;
+            buttons: [
+              	// Button one - takes user to logout URL
+                { text: o.logOutNowButtonLabel, click: function() { 
+                	$.ajax({
+                		headers: o.ajaxHeaders,
+                        type: o.logoutUrlRequestType,
+                        url: o.logoutUrl,
+                        success: function(data, textStatus, jqXHR) {
+                        	window.location = o.logoutSuccessUrl;
+                        }
+                    });
+                	} 
                 },
                 // Button two - closes dialog and makes call to keep-alive URL
-                "Stay Connected": function () {
-                    $(this).dialog('close');
-
+                { text: o.stayConnectedButtonLabel, click: function() { 
+                	$(this).dialog('close');
                     $.ajax({
+                    	headers: o.ajaxHeaders,
                         type: o.keepAliveAjaxRequestType,
                         url: o.appendTime ? updateQueryStringParameter(o.keepAliveUrl, "_", new Date().getTime()) : o.keepAliveUrl
                     });
@@ -98,10 +134,10 @@
                     // Stop redirect timer and restart warning timer
                     controlRedirTimer('stop');
                     controlDialogTimer('start');
-                }
-            }
+                }}
+            ]
         });
-
+        
         function controlDialogTimer(action) {
             switch (action) {
                 case 'start':
